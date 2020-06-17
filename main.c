@@ -71,9 +71,10 @@ int main()
 	FILE *fp;
 	FILE *log;
 	log = fopen("ipup.log", "a");
-	struct stat file_info;
+	//struct stat file_info;
 	char ipstr[64];
 	char buff[64];
+	char result[1024];
 	char timestamp[64];
 	time_t now;
 	time(&now);
@@ -98,17 +99,17 @@ int main()
 	fp = fopen("ip", "r");
 	fgets(buff, (sizeof(buff)), fp);
 	fclose(fp);
-	//if (!strcmp(ipstr, buff))
-	//	exit(EXIT_SUCCESS);
-	fprintf(log, "%s: IP has changed. ", timestamp);
-	fprintf(stdout, "%s: IP has changed. ", timestamp);
+	if (!strcmp(ipstr, buff))
+		exit(EXIT_SUCCESS);
+	fprintf(log, "%s: IP has changed to %s", timestamp, ipstr);
+	fprintf(stdout, "%s: IP has changed to %s", timestamp, ipstr);
 	fp = fopen("ip", "w");
 	fprintf(fp, "%s", ipstr);
 	fclose(fp);
 	curl_easy_cleanup(curl);
 	}
-  	
-  	struct config *conf = malloc(sizeof(struct config));
+	
+	struct config *conf = malloc(sizeof(struct config));
 	//size_t len;
 	
 	fp = fopen("conf", "r");
@@ -116,7 +117,7 @@ int main()
 	
 	//len = strlen(conf->url);
 	//if (len > 0 && conf->url[len-1] == '\n')
-    //conf->url[--len] = '\0';
+	//conf->url[--len] = '\0';
     
 	getString(conf->email, sizeof(conf->email), fp);
 	getString(conf->key, sizeof(conf->key), fp);
@@ -149,47 +150,35 @@ int main()
 		strncat(buff3, conf->key, strlen(conf->key));
 		headers = curl_slist_append(headers, buff3);
 		printf("%s%s\n", buff2, buff3);
-    /* enable uploading */ 
 
-		curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
- 
-    /* HTTP PUT please */ 
-	//curl_easy_setopt(curl, CURLOPT_PUT, 1L);
- 
-    /* specify target URL, and note that this URL should include a file
-    name, not only a directory */ 
 		curl_easy_setopt(curl, CURLOPT_URL, conf->url);
 
+		curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    /* now specify which file to upload */ 
-		curl_easy_setopt(curl, CURLOPT_READDATA, conf->data);
- 
-    /* provide the size of the upload, we specicially typecast the value
-       to curl_off_t since we must be sure to use the correct data size */ 
-		curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE,
-					 (curl_off_t)file_info.st_size);
- 
-    /* Now run off and do what you've been told! */ 
+		curl_easy_setopt(curl, CURLOPT_POSTFIELDS, conf->data);
+		curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&result);
 		res = curl_easy_perform(curl);
-    /* Check for errors */ 
 		if(res != CURLE_OK)
 		{
-			fprintf(log, "curl_easy_perform() failed to update IP with cloudflare: %s\n", curl_easy_strerror(res));
-			fprintf(stderr, "curl_easy_perform() failed to update IP with cloudflare: %s\n", curl_easy_strerror(res));
+			fprintf(log, "%s: curl_easy_perform() failed to update IP with cloudflare: %s\n", timestamp, curl_easy_strerror(res));
+			fprintf(stderr, "%s: curl_easy_perform() failed to update IP with cloudflare: %s\n", timestamp, curl_easy_strerror(res));
 			exit(EXIT_FAILURE);
 		}
 		else
 		{
-			fprintf(log, "SUCCESS - updated IP with cloudflare\n");
-			fprintf(stdout, "SUCCESS - updated IP with cloudflare\n");
+			fprintf(log, "%s ", result);
+			fprintf(log, "%s: SUCCESS - updated IP with cloudflare to %s", timestamp, ipstr);
+			fprintf(stdout, "%s: SUCCESS - updated IP with cloudflare to %s", timestamp, ipstr);
 		}
  
     /* always cleanup */ 
 		curl_easy_cleanup(curl);
 	}
 	
-	curl_global_cleanup();
-	free(conf);
-	fclose(log);
-	return 0;
-	}
+curl_global_cleanup();
+free(conf);
+fclose(log);
+return 0;
+}
