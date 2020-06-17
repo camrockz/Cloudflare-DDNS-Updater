@@ -5,3 +5,5 @@ project(ipup LANGUAGES C)
 add_executable(ipup main.c)
 
 install(TARGETS ipup RUNTIME DESTINATION bin)
+
+target_link_libraries(ipup curl)
