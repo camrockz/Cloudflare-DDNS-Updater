@@ -28,8 +28,8 @@ int main()
 	FILE *fp;
 	FILE *log;
 	log = fopen("ipup.log", "a");
-	char ipstr[64];
-	char buff[64];
+	char ipstr[128];
+	char buff[128];
 	char result[1024];
 	
 	curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -59,9 +59,6 @@ int main()
 	}
 	fprintf(log, "%s: IP has changed to %s", timestamp(), ipstr);
 	fprintf(stdout, "%s: IP has changed to %s", timestamp(), ipstr);
-	fp = fopen("ip", "w");
-	fprintf(fp, "%s", ipstr);
-	fclose(fp);
 	curl_easy_cleanup(curl);
 	}
 	
@@ -85,19 +82,19 @@ int main()
 	curl = curl_easy_init();
 	if(curl)
 	{
-		char buff2[64];
-		char buff3[64];
+		char buff2[128];
+		char buff3[128];
 		
 		struct curl_slist *headers = NULL;
 		headers = curl_slist_append(headers, "Accept: application/json");
 		headers = curl_slist_append(headers, "Content-Type: application/json");
 		
 		snprintf(buff2, sizeof(buff2), "X-Auth-Email: ");
-		strncat(buff2, conf->email, strlen(conf->email));
+		strncat(buff2, conf->email, (sizeof(buff2) - strlen(buff2)-1));
 		headers = curl_slist_append(headers, buff2);
 		
 		snprintf(buff3, sizeof(buff3), "X-Auth-Key: ");
-		strncat(buff3, conf->key, strlen(conf->key));
+		strncat(buff3, conf->key, (sizeof(buff3) - strlen(buff3)-1));
 		headers = curl_slist_append(headers, buff3);
 
 		curl_easy_setopt(curl, CURLOPT_URL, conf->url);
@@ -121,11 +118,21 @@ int main()
 			{
 				fprintf(log, "%s: SUCCESS - updated IP with cloudflare to %s", timestamp(), ipstr);
 				fprintf(stdout, "%s: SUCCESS - updated IP with cloudflare to %s", timestamp(), ipstr);
+				if ((fp = fopen("ip", "w")) != NULL)
+				{
+					fprintf(fp, "%s", ipstr);
+					fclose(fp);
+				}
+				else
+				{
+					fprintf(log, "%s: FILE ERROR - could not write IP file\n", timestamp());
+					fprintf(stdout, "%s: FILE ERROR - could not write IP file\n", timestamp());
+				}
 			}
 			else
 			{
-				fprintf(log, "%s: FAILURE - dumping result: %s", timestamp(), result);
-				fprintf(stdout, "%s: FAILURE - dumping result: %s", timestamp(), result);
+				fprintf(log, "%s: FAILURE - dumping result: %s\n", timestamp(), result);
+				fprintf(stdout, "%s: FAILURE - dumping result: %s\n", timestamp(), result);
 			}
 		}
 		curl_easy_cleanup(curl);
@@ -139,7 +146,7 @@ return 0;
 
 char *timestamp()
 {
-	static char timestamp[64];
+	static char timestamp[128];
 	time_t now;
 	time(&now);
 	struct tm *local = localtime(&now);
