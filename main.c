@@ -27,10 +27,13 @@ int main()
 	CURLcode res;
 	FILE *fp;
 	FILE *log;
-	log = fopen("ipup.log", "a");
-	char ipstr[128];
-	char buff[128];
+	char ipstr[64];
+	char buff[64];
+	char buff2[64];
+	char buff3[64];
 	char result[1024];
+	
+	log = fopen("ipup.log", "a");
 	
 	curl_global_init(CURL_GLOBAL_DEFAULT);
  
@@ -64,7 +67,12 @@ int main()
 	
 	struct config *conf = malloc(sizeof(struct config));
 	
-	fp = fopen("conf", "r");
+	if ((fp = fopen("conf", "r")) == NULL)
+	{
+		fprintf(log, "%s: FILE ERROR - could not open conf file\n", timestamp());
+		fprintf(stdout, "%s: FILE ERROR - could not open conf file\n", timestamp());
+		exit(EXIT_FAILURE);
+	}
 	getString(conf->url, sizeof(conf->url), fp);
 	getString(conf->email, sizeof(conf->email), fp);
 	getString(conf->key, sizeof(conf->key), fp);
@@ -82,9 +90,6 @@ int main()
 	curl = curl_easy_init();
 	if(curl)
 	{
-		char buff2[128];
-		char buff3[128];
-		
 		struct curl_slist *headers = NULL;
 		headers = curl_slist_append(headers, "Accept: application/json");
 		headers = curl_slist_append(headers, "Content-Type: application/json");
@@ -146,7 +151,7 @@ return 0;
 
 char *timestamp()
 {
-	static char timestamp[128];
+	static char timestamp[64];
 	time_t now;
 	time(&now);
 	struct tm *local = localtime(&now);
@@ -160,14 +165,14 @@ void getString(char *buffer, size_t size, FILE *fp)
 	int i = 0;
 	if (size < 1)
     {
-        fprintf(stderr , "String length out of bounds, exiting");
+        fprintf(stderr , "String length out of bounds, exiting\n");
         exit(EXIT_FAILURE);
     }
     while (((c = getc(fp)) == '\n' || c == '\0') && c != EOF)
 	{}
 	if (c == EOF)
 	{
-		fprintf(stderr , "No string was found, exiting");
+		fprintf(stderr , "No string was found, exiting\n");
 		exit(EXIT_FAILURE);
 	}
 	buffer[i] = c;
@@ -179,14 +184,14 @@ void getString(char *buffer, size_t size, FILE *fp)
 	}
     if (c != '\n' && c != '\0' && c != EOF)
     {
-		fprintf(stderr , "Buffer too small for string. Flushing stream to next newline char or end of file");
+		fprintf(stderr , "Buffer too small for string. Flushing stream to next newline char or end of file\n");
 		buffer[i] = '\0';
         while ((c = getc(fp)) != '\n' && c != '\0' && c != EOF)
         {
             i++;
             if (i > 1024)
             {
-                fprintf(stderr , "Buffer overflow, exiting");
+                fprintf(stderr , "Buffer overflow, exiting\n");
                 exit(EXIT_FAILURE);
             }
         }
