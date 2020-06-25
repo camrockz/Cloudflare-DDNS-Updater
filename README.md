@@ -4,6 +4,6 @@ A simple executable to check the IP address that points to the current machine, 
 
 Requirements
 
-- Glibc or a POSIX.1-2008 compatible libc
-- A recent version of libcurl
-- CMake 3.0+
+- C99 libc and compiler
+- Libcurl
+- CMake 3.0+ (optional)

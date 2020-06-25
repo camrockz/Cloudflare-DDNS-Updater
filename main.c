@@ -27,11 +27,12 @@ int main()
     CURLcode res;
     FILE *fp;
     FILE *log;
-    char ipstr[64];
     char buff[64];
-    char buff2[64];
-    char buff3[64];
+    char buff2[128];
+    char buff3[128];
     char result[1024];
+    
+    struct config *conf = malloc(sizeof(struct config));
     
     log = fopen("ipup.log", "a");
     
@@ -42,7 +43,7 @@ int main()
     {
         curl_easy_setopt(curl, CURLOPT_URL, "http://ipv4.icanhazip.com");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&ipstr);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&conf->ip);
         res = curl_easy_perform(curl);
         if(res != CURLE_OK)
         {
@@ -52,20 +53,18 @@ int main()
         }
     if ((fp = fopen("ip", "r")) != NULL)
     {
-        fgets(buff, (sizeof(buff)), fp);
+        getString(buff, (sizeof(buff)), fp);
         fclose(fp);
     }
-    if (!strcmp(ipstr, buff))
+    if (!strcmp(conf->ip, buff))
     {
         printf("IP has not changed!\n");
         exit(EXIT_SUCCESS);
     }
-    fprintf(log, "%s: IP has changed to %s", timestamp(), ipstr);
-    fprintf(stdout, "%s: IP has changed to %s", timestamp(), ipstr);
+    fprintf(log, "%s: IP has changed to %s\n", timestamp(), conf->ip);
+    fprintf(stdout, "%s: IP has changed to %s\n", timestamp(), conf->ip);
     curl_easy_cleanup(curl);
     }
-    
-    struct config *conf = malloc(sizeof(struct config));
     
     if ((fp = fopen("conf", "r")) == NULL)
     {
@@ -80,12 +79,7 @@ int main()
     getString(conf->zoneID, sizeof(conf->zoneID), fp);
     getString(conf->recordID, sizeof(conf->recordID), fp);
     fclose(fp);
-    fp = fmemopen(ipstr, sizeof(ipstr), "r");
-    getString(conf->ip, sizeof(conf->ip), fp);
-    fclose(fp);
-    fp = fmemopen(conf->data, sizeof(conf->data), "w");
-    fprintf(fp, "{\"id\":\"%s\",\"type\":\"A\",\"name\":\"%s\",\"content\":\"%s\",\"ttl\":120}", conf->zoneID, conf->record, conf->ip);
-    fclose(fp);
+    snprintf(conf->data, sizeof(conf->data), "{\"id\":\"%s\",\"type\":\"A\",\"name\":\"%s\",\"content\":\"%s\",\"ttl\":120}", conf->zoneID, conf->record, conf->ip);
     
     curl = curl_easy_init();
     if(curl)
@@ -94,12 +88,12 @@ int main()
         headers = curl_slist_append(headers, "Accept: application/json");
         headers = curl_slist_append(headers, "Content-Type: application/json");
         
-        snprintf(buff2, sizeof(buff2), "X-Auth-Email: ");
-        strncat(buff2, conf->email, (sizeof(buff2) - strlen(buff2)-1));
+        snprintf(buff2, sizeof(buff2), "X-Auth-Email: %s", conf->email);
+        //strncat(buff2, conf->email, (sizeof(buff2) - strlen(buff2)-1));
         headers = curl_slist_append(headers, buff2);
         
-        snprintf(buff3, sizeof(buff3), "X-Auth-Key: ");
-        strncat(buff3, conf->key, (sizeof(buff3) - strlen(buff3)-1));
+        snprintf(buff3, sizeof(buff3), "X-Auth-Key: %s", conf->key);
+        //strncat(buff3, conf->key, (sizeof(buff3) - strlen(buff3)-1));
         headers = curl_slist_append(headers, buff3);
         
         curl_easy_setopt(curl, CURLOPT_URL, conf->url);
@@ -121,11 +115,11 @@ int main()
             char good[] = {"success\":true,\"errors\":[]"};
             if (strstr(result, good) != NULL)
             {
-                fprintf(log, "%s: SUCCESS - updated IP with cloudflare to %s", timestamp(), ipstr);
-                fprintf(stdout, "%s: SUCCESS - updated IP with cloudflare to %s", timestamp(), ipstr);
+                fprintf(log, "%s: SUCCESS - updated IP with cloudflare to %s\n", timestamp(), conf->ip);
+                fprintf(stdout, "%s: SUCCESS - updated IP with cloudflare to %s\n", timestamp(), conf->ip);
                 if ((fp = fopen("ip", "w")) != NULL)
                 {
-                    fprintf(fp, "%s", ipstr);
+                    fprintf(fp, "%s", conf->ip);
                     fclose(fp);
                 }
                 else
@@ -191,7 +185,7 @@ void getString(char *buffer, size_t size, FILE *fp)
             i++;
             if (i > 1024)
             {
-                fprintf(stderr , "Buffer overflow, exiting\n");
+                fprintf(stderr , "String too long, exiting\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -202,6 +196,6 @@ void getString(char *buffer, size_t size, FILE *fp)
 size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
-    strncpy((char*)userp, (char*)buffer, realsize);
+    snprintf(userp, realsize, "%s", (char*)buffer);
     return realsize;
 }
