@@ -72,7 +72,6 @@ int main()
         fprintf(stdout, "%s: FILE ERROR - could not open conf file\n", timestamp());
         exit(EXIT_FAILURE);
     }
-    getString(conf->url, sizeof(conf->url), fp);
     getString(conf->email, sizeof(conf->email), fp);
     getString(conf->key, sizeof(conf->key), fp);
     getString(conf->record, sizeof(conf->record), fp);
@@ -80,6 +79,7 @@ int main()
     getString(conf->recordID, sizeof(conf->recordID), fp);
     fclose(fp);
     snprintf(conf->data, sizeof(conf->data), "{\"id\":\"%s\",\"type\":\"A\",\"name\":\"%s\",\"content\":\"%s\",\"ttl\":120}", conf->zoneID, conf->record, conf->ip);
+    snprintf(conf->url, sizeof(conf->url), "https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s", conf->zoneID, conf->recordID);
     
     curl = curl_easy_init();
     if(curl)
@@ -89,11 +89,9 @@ int main()
         headers = curl_slist_append(headers, "Content-Type: application/json");
         
         snprintf(buff2, sizeof(buff2), "X-Auth-Email: %s", conf->email);
-        //strncat(buff2, conf->email, (sizeof(buff2) - strlen(buff2)-1));
         headers = curl_slist_append(headers, buff2);
         
         snprintf(buff3, sizeof(buff3), "X-Auth-Key: %s", conf->key);
-        //strncat(buff3, conf->key, (sizeof(buff3) - strlen(buff3)-1));
         headers = curl_slist_append(headers, buff3);
         
         curl_easy_setopt(curl, CURLOPT_URL, conf->url);
