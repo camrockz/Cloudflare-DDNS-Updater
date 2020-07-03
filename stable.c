@@ -5,21 +5,24 @@
 
 struct config
 {
-    char url[256];
     char email[64];
     char key[64];
     char record[64];
     char zoneID[64];
     char recordID[64];
-    char ip[64];
-    char data[256];
+};
+
+struct memory
+{
+   char *response;
+   size_t size;
 };
 
 char *timestamp();
 
 void getString(char *buffer, size_t size, FILE *fp);
 
-size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp);
+static size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp);
 
 int main()
 {
@@ -30,8 +33,11 @@ int main()
     char buff[64];
     char buff2[128];
     char buff3[128];
-    char result[1024];
+    char url[256];
+    char data[256];
     
+    static struct memory ip;
+    static struct memory result;
     struct config *conf = malloc(sizeof(struct config));
     
     log = fopen("ipup.log", "a");
@@ -43,7 +49,7 @@ int main()
     {
         curl_easy_setopt(curl, CURLOPT_URL, "http://ipv4.icanhazip.com");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&conf->ip);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&ip);
         res = curl_easy_perform(curl);
         if(res != CURLE_OK)
         {
@@ -51,20 +57,23 @@ int main()
             fprintf(log, "%s: curl_easy_perform() failed to get IP: %s\n", timestamp(), curl_easy_strerror(res));
             exit(EXIT_FAILURE);
         }
+    }
     if ((fp = fopen("ip", "r")) != NULL)
     {
         getString(buff, (sizeof(buff)), fp);
         fclose(fp);
     }
-    if (!strcmp(conf->ip, buff))
+    size_t len = strlen(ip.response);
+    if (len > 0 && ip.response[len-1] == '\n')
+        ip.response[--len] = '\0';
+    if (!strcmp(ip.response, buff))
     {
         printf("IP has not changed!\n");
         exit(EXIT_SUCCESS);
     }
-    fprintf(log, "%s: IP has changed to %s\n", timestamp(), conf->ip);
-    fprintf(stdout, "%s: IP has changed to %s\n", timestamp(), conf->ip);
+    fprintf(log, "%s: IP has changed to %s\n", timestamp(), ip.response);
+    fprintf(stdout, "%s: IP has changed to %s\n", timestamp(), ip.response);
     curl_easy_cleanup(curl);
-    }
     
     if ((fp = fopen("conf", "r")) == NULL)
     {
@@ -78,8 +87,8 @@ int main()
     getString(conf->zoneID, sizeof(conf->zoneID), fp);
     getString(conf->recordID, sizeof(conf->recordID), fp);
     fclose(fp);
-    snprintf(conf->data, sizeof(conf->data), "{\"id\":\"%s\",\"type\":\"A\",\"name\":\"%s\",\"content\":\"%s\",\"ttl\":120}", conf->zoneID, conf->record, conf->ip);
-    snprintf(conf->url, sizeof(conf->url), "https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s", conf->zoneID, conf->recordID);
+    snprintf(data, sizeof(data), "{\"id\":\"%s\",\"type\":\"A\",\"name\":\"%s\",\"content\":\"%s\",\"ttl\":120}", conf->zoneID, conf->record, ip.response);
+    snprintf(url, sizeof(url), "https://api.cloudflare.com/client/v4/zones/%s/dns_records/%s", conf->zoneID, conf->recordID);
     
     curl = curl_easy_init();
     if(curl)
@@ -94,10 +103,10 @@ int main()
         snprintf(buff3, sizeof(buff3), "X-Auth-Key: %s", conf->key);
         headers = curl_slist_append(headers, buff3);
         
-        curl_easy_setopt(curl, CURLOPT_URL, conf->url);
+        curl_easy_setopt(curl, CURLOPT_URL, url);
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, conf->data);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data);
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcrp/0.1");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&result);
@@ -111,13 +120,13 @@ int main()
         else
         {
             char good[] = {"success\":true,\"errors\":[]"};
-            if (strstr(result, good) != NULL)
+            if (strstr(result.response, good) != NULL)
             {
-                fprintf(log, "%s: SUCCESS - updated IP with cloudflare to %s\n", timestamp(), conf->ip);
-                fprintf(stdout, "%s: SUCCESS - updated IP with cloudflare to %s\n", timestamp(), conf->ip);
+                fprintf(log, "%s: SUCCESS - updated IP with cloudflare to %s\n", timestamp(), ip.response);
+                fprintf(stdout, "%s: SUCCESS - updated IP with cloudflare to %s\n", timestamp(), ip.response);
                 if ((fp = fopen("ip", "w")) != NULL)
                 {
-                    fprintf(fp, "%s", conf->ip);
+                    fprintf(fp, "%s", ip.response);
                     fclose(fp);
                 }
                 else
@@ -128,8 +137,8 @@ int main()
             }
             else
             {
-                fprintf(log, "%s: FAILURE - dumping result: %s\n", timestamp(), result);
-                fprintf(stdout, "%s: FAILURE - dumping result: %s\n", timestamp(), result);
+                fprintf(log, "%s: FAILURE - dumping result: %s\n", timestamp(), result.response);
+                fprintf(stdout, "%s: FAILURE - dumping result: %s\n", timestamp(), result.response);
             }
         }
         curl_easy_cleanup(curl);
@@ -191,9 +200,19 @@ void getString(char *buffer, size_t size, FILE *fp)
     buffer[i] = '\0';
 }
 
-size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp)
+static size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
-    snprintf(userp, realsize, "%s", (char*)buffer);
+    struct memory *mem = (struct memory *)userp;
+ 
+    char *ptr = realloc(mem->response, mem->size + realsize + 1);
+    if(ptr == NULL)
+    return 0;  /* out of memory! */
+ 
+    mem->response = ptr;
+    memcpy(&(mem->response[mem->size]), buffer, realsize);
+    mem->size += realsize;
+    mem->response[mem->size] = 0;
+ 
     return realsize;
 }
