@@ -6,4 +6,4 @@ add_executable(ipup stable.c)
 
 install(TARGETS ipup RUNTIME DESTINATION bin)
 
-target_link_libraries(ipup curl)
+target_link_libraries(ipup curl json-c)
