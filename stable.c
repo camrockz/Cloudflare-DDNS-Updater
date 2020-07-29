@@ -241,7 +241,7 @@ void getString(char *buffer, size_t size, FILE *fp)
 {
     char c;
     int i = 0;
-    if (size < 1)
+    if (size < 2)
     {
         fprintf(stderr , "String length out of bounds, exiting\n");
         exit(EXIT_FAILURE);
