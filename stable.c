@@ -1,6 +1,16 @@
+/* 
+ * Copyright 2020, Camrockz https://github.com/camrockz
+ * 
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
+#include <errno.h>
 #include <curl/curl.h>
 #include <json-c/json.h>
 
@@ -23,7 +33,7 @@ char *timestamp();
 
 void getString(char *buffer, size_t size, FILE *fp);
 
-static size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp);
+size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp);
 
 int main()
 {
@@ -51,12 +61,18 @@ int main()
         curl_easy_setopt(curl, CURLOPT_URL, "http://ipv4.icanhazip.com");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&ip);
-        res = curl_easy_perform(curl);
-        if(res != CURLE_OK)
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5);
+        res = CURL_LAST;
+        int i = 0;
+        while((res != CURLE_OK) && (i < 8))
+        {
+            res = curl_easy_perform(curl);
+            i++;
+        }
+        if (i == 8)
         {
             fprintf(stderr, "%s: curl_easy_perform() failed to get IP: %s\n", timestamp(), curl_easy_strerror(res));
             fprintf(log, "%s: curl_easy_perform() failed to get IP: %s\n", timestamp(), curl_easy_strerror(res));
-            fclose(log);
             exit(EXIT_FAILURE);
         }
     }
@@ -65,6 +81,7 @@ int main()
         getString(buff, (sizeof(buff)), fp);
         fclose(fp);
     }
+    else errno = 0;
     size_t len = strlen(ip.response);
     if (len > 0 && ip.response[len-1] == '\n')
         ip.response[--len] = '\0';
@@ -81,11 +98,21 @@ int main()
     if ((fp = fopen("../config.json", "r")) == NULL)
     {
         fprintf(log, "%s: FILE ERROR - could not open config.json file\n", timestamp());
-        fprintf(stdout, "%s: FILE ERROR - could not open config.json file\n", timestamp());
+        fprintf(stderr, "%s: FILE ERROR - could not open config.json file\n", timestamp());
         fclose(log);
+        fclose(fp);
         exit(EXIT_FAILURE);
     }
     fread(filebuff, sizeof(filebuff), 1, fp);
+    if ((fread(filebuff, sizeof(filebuff), 1, fp) < 1) && (feof(fp) == 0))
+    {
+        fprintf(log, "%s: FILE ERROR - could not read config.json file\n", timestamp());
+        fprintf(stderr, "%s: FILE ERROR - could not read config.json file\n", timestamp());
+        fclose(log);
+        fclose(fp);
+        exit(EXIT_FAILURE);
+    }
+    fclose(fp);
     parsed = json_tokener_parse(filebuff);
     json_object_object_get_ex(parsed, "email", &email);
     conf->email = json_object_get_string(email);
@@ -200,13 +227,13 @@ int main()
                 else
                 {
                     fprintf(log, "%s: FILE ERROR - could not write IP file\n", timestamp());
-                    fprintf(stdout, "%s: FILE ERROR - could not write IP file\n", timestamp());
+                    fprintf(stderr, "%s: FILE ERROR - could not write IP file\n", timestamp());
                 }
             }
             else
             {
                 fprintf(log, "%s: FAILURE - dumping result: %s\n", timestamp(), result3.response);
-                fprintf(stdout, "%s: FAILURE - dumping result: %s\n", timestamp(), result3.response);
+                fprintf(stderr, "%s: FAILURE - dumping result: %s\n", timestamp(), result3.response);
             }
         }
         curl_easy_cleanup(curl);
@@ -274,10 +301,10 @@ void getString(char *buffer, size_t size, FILE *fp)
             }
         }
     }
-    buffer[i] = '\0';
+    buffer[i] = 0;
 }
 
-static size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp)
+size_t write_data(void *buffer, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
     struct memory *mem = (struct memory *)userp;
