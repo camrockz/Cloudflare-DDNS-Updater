@@ -1,0 +1,14 @@
+[Unit]
+Description=Cloudflare DDNS Updater
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=3
+ExecStart=/usr/bin/ipup
+DynamicUser=1
+WatchdogSec=90
+
+[Install]
+WantedBy=multi-user.target

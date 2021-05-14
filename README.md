@@ -4,10 +4,11 @@ A simple executable to check the IP address that points to the current machine, 
 
 ## Requirements
 
-- C99 libc and compiler
+- GCC or Clang
 - Libcurl
 - Libjson-c
-- CMake 3.0+ (optional)
+- CMake 3.0+
+- Systemd (optional)
 
 ## Building
 
@@ -16,23 +17,36 @@ git clone https://github.com/camrockz/Cloudflare-DDNS-Updater.git
 mkdir build
 cd /build
 ```
-If you are using CMake
+###With systemd support
 
 ```
-cmake .. -DCMAKE_BUILD_TYPE=release
+cmake .. -DCMAKE_BUILD_TYPE=release -DSYSTEMD=ON
 make
 ```
-Else use GCC or Clang
+###Without systemd support
 
 ```
-gcc -O3 -DNDEBUG -o ipup ../stable.c -lcurl -ljson-c
+cmake .. -DCMAKE_BUILD_TYPE=release -DSYSTEMD=OFF
+make
 ```
-## Running
+## Install and Run
 
-Rename example-config.json to config.json and replace the strings inside the double quotes **" "** with those that apply to your Cloudflare account. Your key can be found in your Cloudflare account settings.
-
-Run as a cron job every 60 seconds.
+In a root user shell
 
 ```
-* * * * * cd /path/to/build/directory/ && ./ipup
+cp ipup /usr/bin/
+mkdir /etc/ipup
+cp ../ipup.conf /etc/ipup/
+chown root:root /usr/bin/ipup /etc/ipup/ipup.conf
 ```
+Now edit /etc/ipup/ipup.conf with your cloudflare settings
+
+For systemd use
+
+```
+cp ../ipup.service /usr/lib/systemd/system/
+systemctl enable ipup
+systemctl start ipup
+```
+
+For init systems other than systemd, install a startup script for the ipup executable as per instructions for your init system.
