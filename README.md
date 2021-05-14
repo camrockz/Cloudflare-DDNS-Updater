@@ -1,6 +1,6 @@
 # Cloudflare DDNS Updater
 
-A simple executable to check the IP address that points to the current machine, and update Cloudflare's DDNS system with our domain name.
+A service to check the IP address that points to the current machine, and update Cloudflare's DDNS system with our domain name.
 
 ## Requirements
 
@@ -17,13 +17,13 @@ git clone https://github.com/camrockz/Cloudflare-DDNS-Updater.git
 mkdir build
 cd /build
 ```
-###With systemd support
+### With systemd support
 
 ```
 cmake .. -DCMAKE_BUILD_TYPE=release -DSYSTEMD=ON
 make
 ```
-###Without systemd support
+### Without systemd support
 
 ```
 cmake .. -DCMAKE_BUILD_TYPE=release -DSYSTEMD=OFF
