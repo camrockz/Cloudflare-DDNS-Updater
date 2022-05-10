@@ -254,12 +254,12 @@ int getConfig(char* filename)
     
     if ((fd = open(filename, O_RDONLY)) < 0)
     {
-        LOG("FILE ERROR - could not open config.json file\n");
+        LOG("FILE ERROR - could not open config file\n");
         return -1;
     }
     if (read(fd, filebuff, sizeof(filebuff)) < 0)
     {
-        LOG("FILE ERROR - could not read config.json file\n");
+        LOG("FILE ERROR - could not read config file\n");
         return -1;
     }
     close(fd);
@@ -419,7 +419,7 @@ int updateIP(struct memory *ip)
             parsed4 = json_tokener_parse(result3.response);
             json_object_object_get_ex(parsed4, "success", &success);
             free(result3.response);
-            if (json_object_get_boolean(success) == TRUE)
+            if (json_object_get_boolean(success) != 0)
             {
                 LOG("SUCCESS - updated IP with cloudflare to %s\n", ip->response);
                 curl_easy_cleanup(curlLocal);
